@@ -8,6 +8,7 @@ import Clients from './sections/Clients'
 import Contact from './sections/Contact'
 import Footer from './components/Footer'
 import Properties from './sections/Properties'
+import { AuthProvider } from './components/AuthContext';
 
 
 
@@ -15,7 +16,7 @@ const App = () => {
   return (
     <>
     <DarkModeProvider>
-
+    <AuthProvider>
         <Header/>
         <Hero/>
         <About/>
@@ -24,7 +25,7 @@ const App = () => {
         <Clients/>
         <Contact/>
         <Footer/>
-
+    </AuthProvider>
     </DarkModeProvider>
     </>
   )

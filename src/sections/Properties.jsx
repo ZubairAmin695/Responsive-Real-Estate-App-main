@@ -7,8 +7,10 @@ import 'aos/dist/aos.css';
 import 'aframe';
 import { Entity, Scene } from 'aframe-react'; // A-Frame for 360 VR
 import Modal from 'react-modal'; // Modal for showing the images in a popup
+import { useAuthContext } from '../components/AuthContext';
 
 const Properties = () => {
+    const { user } = useAuthContext(); 
     const [properties, setProperties] = useState([]);
     const [newProperty, setNewProperty] = useState({
         name: '',
@@ -128,22 +130,24 @@ const Properties = () => {
                 </div>
 
                 {/* Property Form */}
-                <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4 mb-10">
-                    <input type="text" name="name" value={newProperty.name} onChange={handleInputChange} placeholder="Name" required />
-                    <input type="text" name="price" value={newProperty.price} onChange={handleInputChange} placeholder="Price" required />
-                    <input type="text" name="address" value={newProperty.address} onChange={handleInputChange} placeholder="Address" required />
-                    <input type="text" name="bath" value={newProperty.bath} onChange={handleInputChange} placeholder="Baths" required />
-                    <input type="text" name="bed" value={newProperty.bed} onChange={handleInputChange} placeholder="Beds" required />
-                    <input type="text" name="area" value={newProperty.area} onChange={handleInputChange} placeholder="Area" required />
-                    <input type="text" name="owner" value={newProperty.owner} onChange={handleInputChange} placeholder="Owner" required />
+                {user ? (
+                    <>
+                    <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4 mb-10">
+                        <input type="text" name="name" value={newProperty.name} onChange={handleInputChange} placeholder="Name" required />
+                        <input type="text" name="price" value={newProperty.price} onChange={handleInputChange} placeholder="Price" required />
+                        <input type="text" name="address" value={newProperty.address} onChange={handleInputChange} placeholder="Address" required />
+                        <input type="text" name="bath" value={newProperty.bath} onChange={handleInputChange} placeholder="Baths" required />
+                        <input type="text" name="bed" value={newProperty.bed} onChange={handleInputChange} placeholder="Beds" required />
+                        <input type="text" name="area" value={newProperty.area} onChange={handleInputChange} placeholder="Area" required />
+                        <input type="text" name="owner" value={newProperty.owner} onChange={handleInputChange} placeholder="Owner" required />
                     
                     {/* Image Upload Input */}
-                    <input type="file" onChange={handleImageUpload} accept="image/*" />
-                    <textarea name="about" value={newProperty.about} onChange={handleInputChange} placeholder="About the property" />
-                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-                        {isEditing ? 'Update Property' : 'Add Property'}
-                    </button>
-                </form>
+                        <input type="file" onChange={handleImageUpload} accept="image/*" />
+                        <textarea name="about" value={newProperty.about} onChange={handleInputChange} placeholder="About the property" />
+                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
+                            {isEditing ? 'Update Property' : 'Add Property'}
+                        </button>
+                 </form>
 
                 {/* Display Uploaded Images */}
                 {newProperty.images.length > 0 && (
@@ -155,12 +159,15 @@ const Properties = () => {
                             </div>
                         ))}
                     </div>
+                )} </>
+                ) : (
+                    <p className="text-gray-500 dark:text-gray-300">Please log in to add or edit properties.</p>
                 )}
 
                 {/* Properties Grid */}
                 <div id='grid-box' className='w-full grid lg:grid-cols-3 grid-cols-1 justify-center items-center gap-8'>
                     {properties.map((item, index) => (
-                        <div data-aos="zoom-in" data-aos-delay="200" key={index} className='bg-white dark:bg-gray-800 rounded-xl w-full'>
+                        <div  key={index} className='bg-white dark:bg-gray-800 rounded-xl w-full'>
                             <div id='image-box' className='bg-cover bg-center h-[250px] rounded-xl p-4 flex flex-col justify-between items-end'>
                                 {item.images.map((image, idx) => (
                                     <img key={idx} src={image} alt={`Property ${idx}`} className="w-full h-32 object-cover" onClick={() => openModal(image)} />
@@ -201,10 +208,10 @@ const Properties = () => {
                                 </div>
 
                                 {/* Edit and Delete Buttons */}
-                                <div className='flex justify-end gap-2'>
+                                {user ?(<div className='flex justify-end gap-2'>
                                     <button onClick={() => handleEdit(index)} className="px-4 py-2 bg-yellow-500 text-white rounded">Edit</button>
                                     <button onClick={() => handleDelete(index)} className="px-4 py-2 bg-red-600 text-white rounded">Delete</button>
-                                </div>
+                                </div>): ("")}
                             </div>
                         </div>
                     ))}
