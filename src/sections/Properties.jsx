@@ -5,12 +5,13 @@ import { MdSpaceDashboard } from 'react-icons/md';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import 'aframe';
-import { Entity, Scene } from 'aframe-react'; // A-Frame for 360 VR
-import Modal from 'react-modal'; // Modal for showing the images in a popup
+import { Entity, Scene } from 'aframe-react';
+import Modal from 'react-modal';
 import { useAuthContext } from '../components/AuthContext';
+import axios from 'axios';
 
 const Properties = () => {
-    const { user } = useAuthContext(); 
+    const { user } = useAuthContext();
     const [properties, setProperties] = useState([]);
     const [newProperty, setNewProperty] = useState({
         name: '',
@@ -25,8 +26,9 @@ const Properties = () => {
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
-    const [selectedImage, setSelectedImage] = useState(''); // Selected image for 360 view
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState('');
+    const [loading, setLoading] = useState(false); // Loading state
 
     useEffect(() => {
         AOS.init({
@@ -61,31 +63,52 @@ const Properties = () => {
         }
     };
 
-    // Add a new property or update an existing one
-    const handleSubmit = (e) => {
+    // Submit form to add or update a property
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (isEditing) {
-            const updatedProperties = [...properties];
-            updatedProperties[editingIndex] = newProperty;
-            setProperties(updatedProperties);
-            setIsEditing(false);
-            setEditingIndex(null);
-        } else {
-            setProperties([...properties, newProperty]);
-        }
-        setNewProperty({
-            name: '',
-            price: '',
-            address: '',
-            bath: '',
-            bed: '',
-            area: '',
-            owner: '',
-            images: [],
-            about: ''
-        });
-    };
+        setLoading(true);
 
+        try {
+            // Prepare data for backend API
+            const payload = {
+                property_name: newProperty.name,
+                property_price: parseFloat(newProperty.price),
+                property_address: newProperty.address,
+                property_baths: parseInt(newProperty.bath, 10),
+                property_beds: parseInt(newProperty.bed, 10),
+                property_area: newProperty.area,
+                property_owner: newProperty.owner,
+                property_image: newProperty.images[0], // Assume single image for simplicity
+                property_description: newProperty.about,
+            };
+
+            // Send POST request to add property
+            const response = await axios.post('http://localhost:1337/api/v1/en/property/add', payload);
+
+            // On successful add, update properties list
+            setProperties([...properties, response.data.data]);
+
+            setNewProperty({
+                name: '',
+                price: '',
+                address: '',
+                bath: '',
+                bed: '',
+                area: '',
+                owner: '',
+                images: [],
+                about: ''
+            });
+
+            alert("Property added successfully!");
+        } catch (error) {
+            console.error("Error adding property:", error);
+            alert("Failed to add property. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+        
+    };
     // Edit a property
     const handleEdit = (index) => {
         setNewProperty(properties[index]);
@@ -120,7 +143,7 @@ const Properties = () => {
         setIsModalOpen(false);
         setSelectedImage('');
     };
-
+ 
     return (
         <div className={`${darkMode ? 'dark bg-black' : 'light bg-transparent'}`}>
             <section className="lg:w[90%] m-auto lg:px-20 px-6 py-20 w-full flex flex-col justify-center items-start gap-10">
@@ -140,16 +163,15 @@ const Properties = () => {
                         <input type="text" name="bed" value={newProperty.bed} onChange={handleInputChange} placeholder="Beds" required />
                         <input type="text" name="area" value={newProperty.area} onChange={handleInputChange} placeholder="Area" required />
                         <input type="text" name="owner" value={newProperty.owner} onChange={handleInputChange} placeholder="Owner" required />
-                    
-                    {/* Image Upload Input */}
+                        
+                        {/* Image Upload */}
                         <input type="file" onChange={handleImageUpload} accept="image/*" />
                         <textarea name="about" value={newProperty.about} onChange={handleInputChange} placeholder="About the property" />
                         <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-                            {isEditing ? 'Update Property' : 'Add Property'}
+                            {loading ? 'Saving...' : isEditing ? 'Update Property' : 'Add Property'}
                         </button>
-                 </form>
-
-                {/* Display Uploaded Images */}
+                    </form>
+                                    {/* Display Uploaded Images */}
                 {newProperty.images.length > 0 && (
                     <div className="flex flex-wrap gap-4 mb-6">
                         {newProperty.images.map((image, index) => (
@@ -164,8 +186,8 @@ const Properties = () => {
                     <p className="text-gray-500 dark:text-gray-300">Please log in to add or edit properties.</p>
                 )}
 
-                {/* Properties Grid */}
-                <div id='grid-box' className='w-full grid lg:grid-cols-3 grid-cols-1 justify-center items-center gap-8'>
+ {/* Properties Grid */}
+ <div id='grid-box' className='w-full grid lg:grid-cols-3 grid-cols-1 justify-center items-center gap-8'>
                     {properties.map((item, index) => (
                         <div  key={index} className='bg-white dark:bg-gray-800 rounded-xl w-full'>
                             <div id='image-box' className='bg-cover bg-center h-[250px] rounded-xl p-4 flex flex-col justify-between items-end'>
