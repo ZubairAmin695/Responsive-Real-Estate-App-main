@@ -5,12 +5,13 @@ import { MdSpaceDashboard } from 'react-icons/md';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import 'aframe';
-import { Entity, Scene } from 'aframe-react'; // A-Frame for 360 VR
-import Modal from 'react-modal'; // Modal for showing the images in a popup
+import { Entity, Scene } from 'aframe-react';
+import Modal from 'react-modal';
 import { useAuthContext } from '../components/AuthContext';
+import axios from 'axios';
 
 const Properties = () => {
-    const { user } = useAuthContext(); 
+    const { user } = useAuthContext();
     const [properties, setProperties] = useState([]);
     const [newProperty, setNewProperty] = useState({
         name: '',
@@ -25,8 +26,10 @@ const Properties = () => {
     });
     const [isEditing, setIsEditing] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
-    const [selectedImage, setSelectedImage] = useState(''); // Selected image for 360 view
+    const [editingId, setEditingId] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedImage, setSelectedImage] = useState('');
+    const [loading, setLoading] = useState(false); // Loading state
 
     useEffect(() => {
         AOS.init({
@@ -35,6 +38,20 @@ const Properties = () => {
             easing: 'ease-in-sine',
             delay: 100,
         });
+
+        // Fetch properties from the API when the component mounts
+        const fetchProperties = async () => {
+            try {
+              const response = await axios.post('http://localhost:1337/api/v1/en/property/list');
+              console.log(response);  // Check the response from the API
+              setProperties(response.data.data);
+            } catch (error) {
+              console.error("Error fetching properties:", error);
+              alert("Error: " + error.response?.status);  // Log the exact error
+            }
+          };
+          
+        fetchProperties();
     }, []);
 
     const { darkMode } = useDarkMode();
@@ -61,42 +78,96 @@ const Properties = () => {
         }
     };
 
-    // Add a new property or update an existing one
-    const handleSubmit = (e) => {
+    // Submit form to add or update a property
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (isEditing) {
-            const updatedProperties = [...properties];
-            updatedProperties[editingIndex] = newProperty;
-            setProperties(updatedProperties);
+        setLoading(true);
+
+        try {
+            const payload = {
+                property_name: newProperty.name,
+                property_price: parseFloat(newProperty.price),
+                property_address: newProperty.address,
+                property_baths: parseInt(newProperty.bath, 10),
+                property_beds: parseInt(newProperty.bed, 10),
+                property_area: newProperty.area,
+                property_owner: newProperty.owner,
+                property_image: newProperty.images[0],
+                property_description: newProperty.about,
+            };
+
+            if (isEditing) {
+                // If editing, send PUT request to update property
+                const response = await axios.post(`http://localhost:1337/api/v1/en/property/edit/${editingId}`, payload);
+                const updatedProperties = [...properties];
+                updatedProperties[editingIndex] = response.data.data;
+                setProperties(updatedProperties);
+                alert("Property updated successfully!");
+            } else {
+                // If adding a new property, send POST request
+                const response = await axios.post('http://localhost:1337/api/v1/en/property/add', payload);
+                setProperties([...properties, response.data.data]);
+                alert("Property added successfully!");
+            }
+
+            // Reset form
+            setNewProperty({
+                name: '',
+                price: '',
+                address: '',
+                bath: '',
+                bed: '',
+                area: '',
+                owner: '',
+                images: [],
+                about: ''
+            });
             setIsEditing(false);
             setEditingIndex(null);
-        } else {
-            setProperties([...properties, newProperty]);
+            setEditingId(null);
+        } catch (error) {
+            console.error("Error saving property:", error);
+            alert("Failed to save property. Please try again.");
+        } finally {
+            setLoading(false);
         }
-        setNewProperty({
-            name: '',
-            price: '',
-            address: '',
-            bath: '',
-            bed: '',
-            area: '',
-            owner: '',
-            images: [],
-            about: ''
-        });
     };
 
     // Edit a property
     const handleEdit = (index) => {
-        setNewProperty(properties[index]);
+        const property = properties[index];
+        setNewProperty({
+            name: property.property_name,
+            price: property.property_price.toString(),
+            address: property.property_address,
+            bath: property.property_baths.toString(),
+            bed: property.property_beds.toString(),
+            area: property.property_area,
+            owner: property.property_owner,
+            images: [property.property_image],
+            about: property.property_description,
+        });
         setIsEditing(true);
         setEditingIndex(index);
+        setEditingId(property.property_id);
     };
 
+
     // Delete a property
-    const handleDelete = (index) => {
-        const filteredProperties = properties.filter((_, i) => i !== index);
-        setProperties(filteredProperties);
+    const handleDelete = async (index, id) => {
+        if (!window.confirm("Are you sure you want to delete this property?")) return;
+
+        try {
+            const response = await axios.get(`http://localhost:1337/api/v1/en/property/delete/${id}`);
+            if (response.status === 200) {
+                // Remove the property from the UI if the deletion was successful
+                setProperties(properties.filter((_, i) => i !== index));
+                alert("Property deleted successfully!");
+            }
+        } catch (error) {
+            console.error("Error deleting property:", error);
+            alert("Failed to delete property. Please try again.");
+        }
     };
 
     // Delete a specific image from the property
@@ -140,16 +211,15 @@ const Properties = () => {
                         <input type="text" name="bed" value={newProperty.bed} onChange={handleInputChange} placeholder="Beds" required />
                         <input type="text" name="area" value={newProperty.area} onChange={handleInputChange} placeholder="Area" required />
                         <input type="text" name="owner" value={newProperty.owner} onChange={handleInputChange} placeholder="Owner" required />
-                    
-                    {/* Image Upload Input */}
+                        
+                        {/* Image Upload */}
                         <input type="file" onChange={handleImageUpload} accept="image/*" />
                         <textarea name="about" value={newProperty.about} onChange={handleInputChange} placeholder="About the property" />
                         <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
-                            {isEditing ? 'Update Property' : 'Add Property'}
+                             {loading ? 'Saving...' : isEditing ? 'Update Property' : 'Add Property'}
                         </button>
-                 </form>
-
-                {/* Display Uploaded Images */}
+                    </form>
+                                    {/* Display Uploaded Images */}
                 {newProperty.images.length > 0 && (
                     <div className="flex flex-wrap gap-4 mb-6">
                         {newProperty.images.map((image, index) => (
@@ -169,12 +239,14 @@ const Properties = () => {
                     {properties.map((item, index) => (
                         <div  key={index} className='bg-white dark:bg-gray-800 rounded-xl w-full'>
                             <div id='image-box' className='bg-cover bg-center h-[250px] rounded-xl p-4 flex flex-col justify-between items-end'>
-                                {item.images.map((image, idx) => (
-                                    <img key={idx} src={image} alt={`Property ${idx}`} className="w-full h-32 object-cover" onClick={() => openModal(image)} />
-                                ))}
-
-                                {/* Property Details */}
-                                <div id='bottom' className='flex justify-between items-end w-full'>
+                                <img
+                                    src={item.property_image}
+                                    alt={item.property_name}
+                                    className="w-full h-32 object-cover"
+                                    onClick={() => openModal(item.property_image)}
+                                />
+                                  {/* Property Details */}
+                                  <div id='bottom' className='flex justify-between items-end w-full'>
                                     <div className='flex justify-start items-center gap-2'>
                                         <FaMapMarkerAlt className='text-white' />
                                         <h1 className='text-white'>{item.address}</h1>
@@ -188,29 +260,29 @@ const Properties = () => {
 
                             {/* Property Info */}
                             <div className='px-6 py-3'>
-                                <h1 className='text-xl text-black font-semibold dark:text-white'>{item.name}</h1>
-                                <h1 className='text-xl text-blue-600 font-bold dark:text-white'>{item.price}</h1>
-                                <p className='dark:text-white'>{item.about}</p>
+                            <h1 className='text-xl text-black font-semibold dark:text-white'>{item.property_name}</h1>
+                                <h1 className='text-xl text-blue-600 font-bold dark:text-white'>{item.property_price}</h1>
+                                <p className='dark:text-white'>{item.property_description}</p>
 
                                 <div className='flex gap-4 mt-4'>
                                     <div className='flex items-center gap-2'>
                                         <FaBath className='text-blue-400' />
-                                        <h1 className='dark:text-white'>{item.bath}</h1>
+                                        <h1 className='dark:text-white'>{item.property_baths}</h1>
                                     </div>
                                     <div className='flex items-center gap-2'>
                                         <FaBed className='text-blue-400' />
-                                        <h1 className='dark:text-white'>{item.bed}</h1>
+                                        <h1 className='dark:text-white'>{item.property_beds}</h1>
                                     </div>
                                     <div className='flex items-center gap-2'>
                                         <MdSpaceDashboard className='text-blue-400' />
-                                        <h1 className='dark:text-white'>{item.area}</h1>
+                                        <h1 className='dark:text-white'>{item.property_area}</h1>
                                     </div>
                                 </div>
 
-                                {/* Edit and Delete Buttons */}
-                                {user ?(<div className='flex justify-end gap-2'>
-                                    <button onClick={() => handleEdit(index)} className="px-4 py-2 bg-yellow-500 text-white rounded">Edit</button>
-                                    <button onClick={() => handleDelete(index)} className="px-4 py-2 bg-red-600 text-white rounded">Delete</button>
+                                     {/* Edit and Delete Buttons */}
+                                     {user ?(<div className='flex justify-end gap-2'>
+                                     <button onClick={() => handleEdit(index)} className="px-4 py-2 bg-yellow-500 text-white rounded">Edit</button>
+                                    <button onClick={() => handleDelete(index, item.property_id)} className="px-4 py-2 bg-red-600 text-white rounded">Delete</button>
                                 </div>): ("")}
                             </div>
                         </div>
